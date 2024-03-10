@@ -5,26 +5,26 @@ import argparse
 from pathlib import Path
 import tiktoken
 
-def generate_file_tree(repo_folder, prefix=""):
+def generate_file_tree(repo_folder, ignored_folders, prefix=""):
     file_tree = ""
     for item in os.listdir(repo_folder):
-        if item.startswith("."):  # Skip hidden files and folders
+        if item.startswith(".") or item in ignored_folders:  # Skip hidden files, folders, and ignored folders
             continue
         item_path = os.path.join(repo_folder, item)
         if os.path.isdir(item_path):
             file_tree += f"{prefix}📁 {item}/\n"
-            file_tree += generate_file_tree(item_path, prefix + "│   ")
+            file_tree += generate_file_tree(item_path, ignored_folders, prefix + "│   ")
         else:
             file_tree += f"{prefix}📄 {item}\n"
     return file_tree
 
-def process_repo(repo_folder):
+def process_repo(repo_folder, ignored_folders):
     output_content = f"Project: {os.path.basename(repo_folder)}\n"
-    output_content += generate_file_tree(repo_folder)
+    output_content += generate_file_tree(repo_folder, ignored_folders)
     output_content += "\n"
 
     for root, dirs, files in os.walk(repo_folder):
-        dirs[:] = [d for d in dirs if not d.startswith(".")]  # Skip hidden folders
+        dirs[:] = [d for d in dirs if not d.startswith(".") and d not in ignored_folders]  # Skip hidden and ignored folders
         for file in files:
             if file.startswith("."):  # Skip hidden files
                 continue
@@ -43,9 +43,9 @@ def count_tokens(content, encoding_name="cl100k_base"):
     num_tokens = len(encoding.encode(content))
     return num_tokens
 
-def main(repo_folder, output_file):
+def main(repo_folder, output_file, ignored_folders):
     # Process repository
-    output_content = process_repo(repo_folder)
+    output_content = process_repo(repo_folder, ignored_folders)
 
     # Write output to file
     with open(output_file, "w", encoding="utf-8") as f:
@@ -63,9 +63,11 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="LLM Prep Tools")
     parser.add_argument("repo_folder", type=str, help="Path to the GitHub repository folder")
     parser.add_argument("output_file", type=str, help="Path to the output file")
+    parser.add_argument("--ignore", nargs="*", default=[], help="Folders to ignore (optional)")
     args = parser.parse_args()
 
     repo_folder = Path(args.repo_folder).resolve()
     output_file = Path(args.output_file).resolve()
+    ignored_folders = args.ignore
 
-    main(str(repo_folder), str(output_file))
+    main(str(repo_folder), str(output_file), ignored_folders)
